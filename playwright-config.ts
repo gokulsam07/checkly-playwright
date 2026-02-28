@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { channel } from "diagnostics_channel";
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -30,11 +31,14 @@ export default defineConfig({
             testDir: './tests/ui',
             workers: 2,
             use: {
-                baseURL: 'https://app.checklyhq.com/',
+                ...devices['Desktop Chrome'],
+                channel: 'chrome',
                 viewport: { width: 1280, height: 720 },
+                baseURL: 'https://app.checklyhq.com/',
                 actionTimeout: 15000,
                 video: "off",
                 screenshot: "only-on-failure",
+                
             },
             timeout: 60000,
             expect: { timeout: 10000 },

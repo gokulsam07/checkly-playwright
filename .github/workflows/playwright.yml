@@ -44,14 +44,14 @@ jobs:
         path: ~/.cache/ms-playwright
         key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-    # Download ONLY Chromium if cache is empty
-    - name: Install Playwright Chromium
+    # Download ONLY Chrome if cache is empty
+    - name: Install Playwright Chrome
       if: steps.playwright-cache.outputs.cache-hit != 'true'
-      run: npx playwright install chromium --with-deps
+      run: npx playwright install chrome --with-deps
 
     # Ensure system dependencies (drivers/libraries) are ready
     - name: Install Playwright System Deps
-      run: npx playwright install-deps chromium
+      run: npx playwright install-deps chrome
 
     # --- Execution Logic ---
     - name: Run Playwright tests
