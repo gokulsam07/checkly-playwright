@@ -4,21 +4,62 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  # This adds the dropdown/parameter selection in GitHub UI
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Select Test Suite to Run'
+        required: true
+        default: 'ui'
+        type: choice
+        options:
+          - ui
+          - api
+
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
+        cache: 'npm' # Caches npm dependencies automatically
+
     - name: Install dependencies
       run: npm ci
+
+    # Cache Playwright Browsers to avoid downloading every time
+    - name: Get Playwright version
+      id: playwright-version
+      run: echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
+
+    - name: Cache Playwright Browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+    # Only install Chromium (Chrome) and only if not found in cache
     - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      run: npx playwright install chromium --with-deps
+
+    # Install system dependencies only (lightweight, ensures OS is ready)
+    - name: Install Playwright System Deps
+      if: steps.playwright-cache.outputs.cache-hit == 'true'
+      run: npx playwright install-deps chromium
+
+    # Run tests based on input (defaulting to 'ui' if triggered by push)
     - name: Run Playwright tests
-      run: npx playwright test
+      run: |
+        TEST_TYPE=${{ github.event.inputs.test_type || 'ui' }}
+        echo "Running $TEST_TYPE tests..."
+        npm run test:$TEST_TYPE
+      
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
