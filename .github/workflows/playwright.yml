@@ -1,9 +1,10 @@
 name: Playwright Tests
 env:
-        API_KEY: ${{ secrets.CHECKLY_API_KEY }}
-        ACCOUNT_ID: ${{ secrets.CHECKLY_ACCOUNT_ID }}
-        USER_EMAIL: ${{ secrets.USER_EMAIL }}
-        USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
+        AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+        ACC_ID: ${{ secrets.ACC_ID }}
+        USER_GOKUL: ${{ secrets.USER_GOKUL }}
+        GOKUL_PASSWORD: ${{ secrets.GOKUL_PASSWORD }}
+        INCORRECT_PASSWORD: ${{ secrets.INCORRECT_PASSWORD }}
         CI: true
 on:
   # This removes automatic triggers. Tests only run when you click "Run workflow"
