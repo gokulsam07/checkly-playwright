@@ -15,7 +15,6 @@ export default defineConfig({
             testDir: './tests/api',
             use: {
                 baseURL: 'https://api.checklyhq.com/v1/',
-                headless: true,
                 screenshot: 'off',
                 video: 'off',
                 extraHTTPHeaders: {
@@ -32,7 +31,6 @@ export default defineConfig({
             workers: 2,
             use: {
                 baseURL: 'https://app.checklyhq.com/',
-                headless: false,
                 viewport: { width: 1280, height: 720 },
                 actionTimeout: 15000,
                 video: "off",
@@ -45,6 +43,9 @@ export default defineConfig({
 
     use: {
         video: 'off',
+        headless: process.env.CI ? true : false,
+        screenshot: 'only-on-failure',
+        trace: 'retain-on-failure',
         actionTimeout: 10000,
     },
 });
