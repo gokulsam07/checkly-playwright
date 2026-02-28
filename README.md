@@ -47,7 +47,7 @@ Before you begin, ensure you have the following installed on your system:
 
 3.  **Set up environment variables:**
 
-    Create a `.env` file in the root of the project and add the necessary environment variables. You can refer to the `playwright-config.ts` to see which variables are expected. For example:
+    1. For local run, Create a `.env` file in the root of the project and add the necessary environment variables. You can refer to the `playwright-config.ts` to see which variables are expected. For example:
 
     ```
     # .env file
@@ -56,7 +56,7 @@ Before you begin, ensure you have the following installed on your system:
     USER_EMAIL=your_email
     USER_PASSWORD=your_password
     ```
-
+    2. For CI run, create a enviroment, add you secrets in Github secrets, use the same in CI workflow. 
 ## Project Structure
 
 The project is organized into the following directories:
