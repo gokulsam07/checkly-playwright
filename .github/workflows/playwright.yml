@@ -1,11 +1,4 @@
 name: Playwright Tests
-env:
-        AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
-        ACC_ID: ${{ secrets.ACC_ID }}
-        USER_GOKUL: ${{ secrets.USER_GOKUL }}
-        GOKUL_PASSWORD: ${{ secrets.GOKUL_PASSWORD }}
-        INCORRECT_PASSWORD: ${{ secrets.INCORRECT_PASSWORD }}
-        CI: true
 on:
   # This removes automatic triggers. Tests only run when you click "Run workflow"
   workflow_dispatch:
@@ -26,6 +19,14 @@ on:
 
 jobs:
   test:
+    environment: playwright-test
+    env:
+            AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+            ACC_ID: ${{ secrets.ACC_ID }}
+            USER_GOKUL: ${{ secrets.USER_GOKUL }}
+            GOKUL_PASSWORD: ${{ secrets.GOKUL_PASSWORD }}
+            INCORRECT_PASSWORD: ${{ secrets.INCORRECT_PASSWORD }}
+            CI: true
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
