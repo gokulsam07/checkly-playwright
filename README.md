@@ -47,7 +47,7 @@ Before you begin, ensure you have the following installed on your system:
 
 3.  **Set up environment variables:**
 
-    1. For local run, Create a `.env` file in the root of the project and add the necessary environment variables. You can refer to the `playwright-config.ts` to see which variables are expected. For example:
+    1. For local run, Create a `.env` file in the root of the project and add the necessary environment variables. Explore the fixtures to see which variables are expected. For example:
 
     ```
     # .env file
@@ -76,7 +76,7 @@ This framework utilizes the Page Object Model (POM) design pattern to create a s
 
 ### Custom Fixtures
 
-Custom fixtures are used to set up and tear down the test environment. They can be found in the `fixtures` directory. This allows for a clean and reusable way to provide context to the tests. API and UI fixtures with auto login or each test is embedded usind the respective fixtures
+Custom fixtures are used to set up and tear down the test environment. They can be found in the `fixtures` directory. This allows for a clean and reusable way to provide context to the tests. API and UI fixtures with auto login for each test is embedded using the respective fixtures.
 
 ## Configuration Deep Dive
 
