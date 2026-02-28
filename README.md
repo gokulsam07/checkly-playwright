@@ -42,7 +42,7 @@ Before you begin, ensure you have the following installed on your system:
 2.  **Install dependencies:**
 
     ```bash
-    npm install
+    npm init playwright@latest
     ```
 
 3.  **Set up environment variables:**
