@@ -8,7 +8,11 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 export default defineConfig({
     fullyParallel: true,
-    reporter: [['html'], ['list']],
+    //reporter: [['html'], ['list']],
+    reporter: [
+    ['line'],
+    ['allure-playwright', { outputFolder: 'allure-results' }]
+  ],
     projects: [
         {
             name: 'api',

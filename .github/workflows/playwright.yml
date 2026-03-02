@@ -1,38 +1,33 @@
 name: Playwright Tests
 on:
-  # This removes automatic triggers. Tests only run when you click "Run workflow"
   workflow_dispatch:
     inputs:
       test_choice:
-        description: 'Choose which script to run'
+        description: 'Select Suite'
         required: true
         default: 'ui'
         type: choice
-        options:
-          - ui
-          - api
-          - custom
+        options: [ui, api]
       custom_command:
-        description: 'If "custom" is selected, enter the full command (e.g., npm run ui -- --grep @smoke)'
+        description: 'Custom args (e.g., --grep @smoke). Leave empty for full suite.'
         required: false
         default: ''
 
 jobs:
   test:
-    environment: playwright-test
-    env:
-            AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
-            ACC_ID: ${{ secrets.ACC_ID }}
-            USER_GOKUL: ${{ secrets.USER_GOKUL }}
-            GOKUL_PASSWORD: ${{ secrets.GOKUL_PASSWORD }}
-            INCORRECT_PASSWORD: ${{ secrets.INCORRECT_PASSWORD }}
-            CI: true
-    timeout-minutes: 60
     runs-on: ubuntu-latest
+    env:
+      AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+      ACC_ID: ${{ secrets.ACC_ID }}
+      USER_GOKUL: ${{ secrets.USER_GOKUL }}
+      GOKUL_PASSWORD: ${{ secrets.GOKUL_PASSWORD }}
+      CI: true
+    
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-node@v4
+    - name: Setup Node
+      uses: actions/setup-node@v4
       with:
         node-version: lts/*
         cache: 'npm'
@@ -40,7 +35,7 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    # --- Browser Caching Logic ---
+    # --- Browser Caching ---
     - name: Get Playwright version
       id: playwright-version
       run: echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
@@ -52,29 +47,60 @@ jobs:
         path: ~/.cache/ms-playwright
         key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-    # Download ONLY Chrome if cache is empty
     - name: Install Playwright Chrome
       if: steps.playwright-cache.outputs.cache-hit != 'true'
       run: npx playwright install chrome --with-deps
 
-    # Ensure system dependencies (drivers/libraries) are ready
-    - name: Install Playwright System Deps
+    - name: Install OS Dependencies
       run: npx playwright install-deps chrome
 
-    # --- Execution Logic ---
-    - name: Run Playwright tests
+    # --- Run Tests ---
+    - name: Run Playwright
       run: |
-        if [ "${{ github.event.inputs.test_choice }}" == "custom" ]; then
-          echo "Executing custom: ${{ github.event.inputs.custom_command }}"
-          ${{ github.event.inputs.custom_command }}
+        CHOICE="${{ github.event.inputs.test_choice }}"
+        CUSTOM="${{ github.event.inputs.custom_command }}"
+        if [ -z "$CUSTOM" ]; then
+          npm run $CHOICE
         else
-          echo "Executing: npm run ${{ github.event.inputs.test_choice }}"
-          npm run ${{ github.event.inputs.test_choice }}
+          npm run $CHOICE -- $CUSTOM
         fi
-      
-    - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
+      continue-on-error: true
+
+    # --- 10-Day Rolling History Logic ---
+    - name: Load Allure History
+      uses: actions/checkout@v4
+      if: always()
+      continue-on-error: true
       with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+        ref: gh-pages
+        path: gh-pages
+
+    - name: Build Allure Report
+      uses: simple-elf/allure-report-action@master
+      if: always()
+      with:
+        allure_results: allure-results
+        gh_pages: gh-pages
+        allure_report: allure-report
+        allure_history: allure-history
+        keep_reports: 10 # This is your rolling window (only 10 latest runs kept)
+
+    - name: Deploy to GitHub Pages
+      if: always()
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./allure-history
+        # Keep results separate so UI and API don't mix
+        destination_dir: playwright-${{ github.event.inputs.test_choice }}
+        keep_files: true 
+
+    # --- Cleanup Artifacts ---
+    - name: Upload Results Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: allure-results-${{ github.event.inputs.test_choice }}
+        path: allure-results
+        overwrite: true
+        
