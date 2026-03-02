@@ -1,4 +1,5 @@
 name: Playwright Tests
+run-name: Playwright Tests (${{ github.event.inputs.test_choice }}) ${{ github.event.inputs.custom_command }}
 on:
   workflow_dispatch:
     inputs:
@@ -16,6 +17,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    environment: playwright-test
     env:
       AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
       ACC_ID: ${{ secrets.ACC_ID }}
