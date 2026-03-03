@@ -69,13 +69,13 @@ jobs:
         fi
       continue-on-error: true
 
-    # --- 10-Day Rolling History Logic ---
+    
     - name: Load Allure History
       uses: actions/checkout@v4
       if: always()
       continue-on-error: true
       with:
-        ref: gh-pages
+        #ref: gh-pages
         path: allure-history-base
 
     - name: Build Allure Report
