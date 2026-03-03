@@ -75,17 +75,16 @@ jobs:
       if: always()
       continue-on-error: true
       with:
-        #ref: gh-pages
-        path: allure-history-base
+        ref: gh-pages
+        path: gh-pages
 
     - name: Build Allure Report
       uses: simple-elf/allure-report-action@master
       if: always()
       with:
         allure_results: allure-results
-        gh_pages: allure-history-base
+        gh_pages: gh-pages
         allure_report: allure-report
-        allure_history: allure-history
         subfolder: ${{ github.event.inputs.test_choice }}
         keep_reports: 10 # This is your rolling window (only 10 latest runs kept)
 
@@ -94,9 +93,8 @@ jobs:
       uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./allure-history
-        # Keep results separate so UI and API don't mix
-        destination_dir: playwright-${{ github.event.inputs.test_choice }}
+        publish_dir: ./allure-report
+        destination_dir: ${{ github.event.inputs.test_choice }}
         keep_files: true 
 
     # --- Cleanup Artifacts ---
