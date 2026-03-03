@@ -1,5 +1,6 @@
 name: Playwright Tests
 run-name: Playwright Tests (${{ github.event.inputs.test_choice }}) ${{ github.event.inputs.custom_command }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +16,8 @@ on:
         default: ''
 
 jobs:
-  test:
+  execute-playwright-automation:
+    name: Run ${{ github.event.inputs.test_choice }} Test Suite
     runs-on: ubuntu-latest
     environment: playwright-test
     env:
@@ -27,91 +29,90 @@ jobs:
       CI: true
     
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
 
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
-        cache: 'npm'
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    # --- Browser Caching ---
-    - name: Get Playwright version
-      id: playwright-version
-      run: echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
+      # --- Browser Caching ---
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
 
-    - name: Cache Playwright Browsers
-      id: playwright-cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-    - name: Install Playwright Chrome
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
-      run: npx playwright install chrome --with-deps
+      - name: Install Playwright Chrome
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chrome --with-deps
 
-    - name: Install OS Dependencies
-      run: npx playwright install-deps chrome
+      - name: Install OS Dependencies
+        run: npx playwright install-deps chrome
 
-    # --- Run Tests ---
-    - name: Run Playwright
-      run: |
-        CHOICE="${{ github.event.inputs.test_choice }}"
-        CUSTOM="${{ github.event.inputs.custom_command }}"
-        if [ -z "$CUSTOM" ]; then
-          npm run $CHOICE
-        else
-          npm run $CHOICE -- $CUSTOM
-        fi
-      continue-on-error: true
+      # --- Run Tests ---
+      - name: Run Playwright
+        run: |
+          CHOICE="${{ github.event.inputs.test_choice }}"
+          CUSTOM="${{ github.event.inputs.custom_command }}"
+          if [ -z "$CUSTOM" ]; then
+            npm run $CHOICE
+          else
+            npm run $CHOICE -- $CUSTOM
+          fi
+        continue-on-error: true # Essential for 10-day history even on failure
 
-    
-    - name: Load Allure History
-      uses: actions/checkout@v4
-      if: always()
-      continue-on-error: true
-      with:
-        ref: gh-pages
-        path: gh-pages
+      # --- Reporting & History Logic ---
+      - name: Sync Previous History
+        uses: actions/checkout@v4
+        if: always()
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: .history-storage # Neutral path prevents "Blue Arrow" corruption
 
-    - name: Build Allure Report
-      uses: simple-elf/allure-report-action@master
-      if: always()
-      with:
-        allure_results: allure-results
-        gh_pages: gh-pages
-        allure_report: allure-report
-        subfolder: ${{ github.event.inputs.test_choice }}
-        keep_reports: 10 # This is your rolling window (only 10 latest runs kept)
+      - name: Merge Results & Build Allure
+        uses: simple-elf/allure-report-action@master
+        if: always()
+        with:
+          allure_results: allure-results
+          gh_pages: .history-storage # Reads old trends from storage
+          allure_report: .temp-report-build
+          allure_history: .final-merged-output # Folder containing New Report + Old Trends
+          subfolder: ${{ github.event.inputs.test_choice }}
+          keep_reports: 10 # Maintains 10-day rolling window
 
-    - name: Deploy to GitHub Pages
-      if: always()
-      uses: peaceiris/actions-gh-pages@v4
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./allure-report
-        destination_dir: ${{ github.event.inputs.test_choice }}
-        keep_files: true 
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./.final-merged-output # Pushes the combined data
+          destination_dir: ${{ github.event.inputs.test_choice }} # Organizes /ui or /api
+          keep_files: true # Prevents API results from overwriting UI results
+          publish_branch: gh-pages
 
-    # --- Cleanup Artifacts ---
-    - name: Upload Results Artifact
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: allure-results-${{ github.event.inputs.test_choice }}
-        path: allure-results
-        overwrite: true
+      - name: Archive Raw Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: raw-data-${{ github.event.inputs.test_choice }}
+          path: allure-results
+          overwrite: true
 
-    - name: Output Report Link
-      if: always()
-      run: |
-        echo "### Allure Report Ready! 🚀" >> $GITHUB_STEP_SUMMARY
-        echo "Report for ${{ github.event.inputs.test_choice }} available here:" >> $GITHUB_STEP_SUMMARY
-        echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ github.event.inputs.test_choice }}/index.html" >> $GITHUB_STEP_SUMMARY
-
-
-        
+      - name: Output Report Link
+        if: always()
+        run: |
+          echo "### Allure Report Ready! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "Report for ${{ github.event.inputs.test_choice }} available here:" >> $GITHUB_STEP_SUMMARY
+          echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ github.event.inputs.test_choice }}/index.html" >> $GITHUB_STEP_SUMMARY
