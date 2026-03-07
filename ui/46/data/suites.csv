@@ -1,0 +1,6 @@
+"DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
+"","0","update an environment variable","chrome","Sat Mar 07 07:51:33 UTC 2026","skipped","Sat Mar 07 07:51:33 UTC 2026","Environment Variable Tests","tests/ui/env-var.spec.ts","",""
+"","0","delete an environment variable","chrome","Sat Mar 07 07:51:33 UTC 2026","skipped","Sat Mar 07 07:51:33 UTC 2026","Environment Variable Tests","tests/ui/env-var.spec.ts","",""
+"","21606","create a new environment variable","chrome","Sat Mar 07 07:51:06 UTC 2026","failed","Sat Mar 07 07:51:28 UTC 2026","Environment Variable Tests","tests/ui/env-var.spec.ts","",""
+"","21161","should not login successfully with invalid credentials @skipauth","chrome","Sat Mar 07 07:51:04 UTC 2026","failed","Sat Mar 07 07:51:25 UTC 2026","","tests/ui/login.spec.ts","",""
+"","21116","should login successfully with valid credentials","chrome","Sat Mar 07 07:51:04 UTC 2026","failed","Sat Mar 07 07:51:25 UTC 2026","","tests/ui/login.spec.ts","",""
