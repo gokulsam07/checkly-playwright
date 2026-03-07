@@ -1,5 +1,5 @@
 name: Playwright Tests
-run-name: Playwright Tests (${{ github.event.inputs.test_choice }}) ${{ github.event.inputs.custom_command }}
+run-name: Playwright Tests (${{ github.event.inputs.test_choice }}) ${{ github.event.inputs.run_type }} ${{ github.event.inputs.custom_command }}
 
 on:
   workflow_dispatch:
@@ -10,16 +10,60 @@ on:
         default: 'ui'
         type: choice
         options: [ui, api]
+      run_type:
+        description: 'Run type'
+        required: true
+        default: 'full'
+        type: choice
+        options: [full, rerun-failures]
       custom_command:
         description: 'Custom args (e.g., --grep @smoke). Leave empty for full suite.'
         required: false
         default: ''
+      shard_count:
+        description: 'Number of parallel shards. 1 = no sharding.'
+        required: true
+        default: 1
+        type: number
+
+concurrency:
+  group: playwright-${{ github.event.inputs.test_choice }}
+  cancel-in-progress: true
 
 jobs:
-  execute-playwright-automation:
-    name: Run ${{ github.event.inputs.test_choice }} Test Suite
+
+  # ============================================================================
+  # JOB 1: SETUP — build dynamic shard matrix
+  # ============================================================================
+  setup:
+    name: 'Setup'
     runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.build-matrix.outputs.shards }}
+    steps:
+      - name: Build Shard Matrix
+        id: build-matrix
+        run: |
+          COUNT=${{ github.event.inputs.shard_count }}
+          echo "shards=[$(seq -s',' 1 $COUNT)]" >> $GITHUB_OUTPUT
+
+  # ============================================================================
+  # JOB 2: RUN TESTS (sharded or single)
+  # Each shard writes its results to allure-results/ and uploads as its own
+  # artifact. publish-report merges all shard artifacts in one place.
+  # ============================================================================
+  run-tests:
+    name: 'Tests | ${{ github.event.inputs.test_choice }} | Shard ${{ matrix.shard }}/${{ github.event.inputs.shard_count }}'
+    runs-on: ubuntu-latest
+    needs: setup
     environment: playwright-test
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.setup.outputs.shards) }}
+
     env:
       AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
       ACC_ID: ${{ secrets.ACC_ID }}
@@ -27,24 +71,23 @@ jobs:
       GOKUL_PASSWORD: ${{ secrets.GOKUL_PASSWORD }}
       INCORRECT_PASSWORD: ${{ secrets.INCORRECT_PASSWORD }}
       CI: true
-    
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
-      # --- Browser Caching ---
-      - name: Get Playwright version
+      - name: Get Playwright Version
         id: playwright-version
-        run: echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
+        run: |
+          echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
 
       - name: Cache Playwright Browsers
         id: playwright-cache
@@ -52,67 +95,164 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          restore-keys: ${{ runner.os }}-playwright-
 
-      - name: Install Playwright Chrome
+      - name: Install Playwright Browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chrome --with-deps
 
       - name: Install OS Dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install-deps chrome
 
-      # --- Run Tests ---
-      - name: Run Playwright
+      - name: Run Tests
+        id: run_tests
         run: |
-          CHOICE="${{ github.event.inputs.test_choice }}"
-          CUSTOM="${{ github.event.inputs.custom_command }}"
-          if [ -z "$CUSTOM" ]; then
-            npm run $CHOICE
-          else
-            npm run $CHOICE -- $CUSTOM
+          CMD="npm run ${{ github.event.inputs.test_choice }}"
+
+          if [ "${{ github.event.inputs.run_type }}" = "rerun-failures" ]; then
+            CMD="$CMD -- --last-failed"
           fi
-        continue-on-error: true # Essential for 10-day history even on failure
 
-      # --- Reporting & History Logic ---
-      - name: Sync Previous History
-        uses: actions/checkout@v4
-        if: always()
+          if [ -n "${{ github.event.inputs.custom_command }}" ]; then
+            CMD="$CMD -- ${{ github.event.inputs.custom_command }}"
+          fi
+
+          if [ "${{ github.event.inputs.shard_count }}" -gt 1 ]; then
+            CMD="$CMD --shard=${{ matrix.shard }}/${{ github.event.inputs.shard_count }}"
+          fi
+
+          echo "Executing: $CMD"
+          eval $CMD
         continue-on-error: true
-        with:
-          ref: gh-pages
-          path: .history-storage # Neutral path prevents "Blue Arrow" corruption
 
-      - name: Merge Results & Build Allure
-        uses: simple-elf/allure-report-action@master
-        if: always()
-        with:
-          allure_results: allure-results
-          gh_pages: .history-storage # Reads old trends from storage
-          allure_report: .temp-report-build
-          allure_history: .final-merged-output # Folder containing New Report + Old Trends
-          subfolder: ${{ github.event.inputs.test_choice }}
-          keep_reports: 10 # Maintains 10-day rolling window
-
-      - name: Publish to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        if: always()
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./.final-merged-output # Pushes the combined data
-          destination_dir: ${{ github.event.inputs.test_choice }} # Organizes /ui or /api
-          keep_files: true # Prevents API results from overwriting UI results
-          publish_branch: gh-pages
-
-      - name: Archive Raw Results
+      # Each shard uploads its own slice of results.
+      # publish-report downloads and merges all of them.
+      - name: Upload Shard Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: raw-data-${{ github.event.inputs.test_choice }}
-          path: allure-results
+          name: shard-results-${{ github.event.inputs.test_choice }}-${{ matrix.shard }}
+          path: allure-results/
           overwrite: true
+          if-no-files-found: ignore     # Rerun shard may have had zero failures
+
+  # ============================================================================
+  # JOB 3: PUBLISH REPORT
+  #
+  # Flow:
+  #   1. Download previous merged raw results (from last run)
+  #   2. Download all shard results from this run
+  #   3. Merge: copy previous results in first, then overlay new results on top
+  #      - Full run:   new results replace everything (all tests re-ran)
+  #      - Rerun:      new results overlay only the retried tests, previously
+  #                    passing tests remain from the previous merged artifact
+  #   4. Upload merged results back (overwrite: true) — single artifact, always current
+  #   5. Generate Allure report from merged results + gh-pages history
+  #   6. Publish to GitHub Pages
+  # ============================================================================
+  publish-report:
+    name: 'Publish Report'
+    runs-on: ubuntu-latest
+    needs: run-tests
+    if: always()
+    timeout-minutes: 15
+
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      # Step 1 — Download previous merged results so rerun has full context.
+      # On a full run these get overwritten anyway, but downloading first
+      # means we never lose results if something goes wrong mid-job.
+      # continue-on-error: true — artifact won't exist on very first run.
+      - name: Download Previous Merged Results
+        uses: actions/download-artifact@v4
+        with:
+          name: merged-results-${{ github.event.inputs.test_choice }}
+          path: allure-results-previous/
+        continue-on-error: true
+
+      # Step 2 — Download all shard results from this run into a separate folder
+      - name: Download Shard Results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: shard-results-${{ github.event.inputs.test_choice }}-*
+          path: allure-results-new/
+          merge-multiple: true
+        continue-on-error: true
+
+      # Step 3 — Merge: previous results go in first, new results overlay on top.
+      # Allure identifies tests by their unique ID in the JSON filename.
+      # New files with the same test ID overwrite old ones — this is the
+      # "retry" mechanism. Tests that didn't run this time keep their old result.
+      - name: Merge Results
+        run: |
+          mkdir -p allure-results
+
+          # Previous results go in first (provides base for rerun scenario)
+          if [ -d allure-results-previous ] && [ "$(ls -A allure-results-previous 2>/dev/null)" ]; then
+            cp -r allure-results-previous/. allure-results/
+            echo "Copied $(ls allure-results-previous | wc -l) previous result files"
+          fi
+
+          # New results overlay on top (overwrite matching test IDs, add new ones)
+          if [ -d allure-results-new ] && [ "$(ls -A allure-results-new 2>/dev/null)" ]; then
+            cp -r allure-results-new/. allure-results/
+            echo "Overlaid $(ls allure-results-new | wc -l) new result files"
+          fi
+
+          echo "Total merged results: $(ls allure-results | wc -l) files"
+
+      # Step 4 — Upload merged results back as single artifact (overwrites previous)
+      - name: Upload Merged Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: merged-results-${{ github.event.inputs.test_choice }}
+          path: allure-results/
+          overwrite: true
+          if-no-files-found: warn
+
+      # Step 5 — Pull history from gh-pages for trend graphs
+      - name: Checkout gh-pages History
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-history/
+        continue-on-error: true
+
+      # Step 6 — Generate report from merged results + history
+      - name: Generate Allure Report
+        uses: simple-elf/allure-report-action@master
+        with:
+          allure_results: allure-results
+          gh_pages: gh-pages-history
+          allure_report: allure-report-build
+          allure_history: allure-final-output
+          subfolder: ${{ github.event.inputs.test_choice }}
+          keep_reports: 20
+
+      # Step 7 — Publish to GitHub Pages
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-final-output/
+          destination_dir: ${{ github.event.inputs.test_choice }}
+          keep_files: true
+          publish_branch: gh-pages
 
       - name: Output Report Link
         if: always()
         run: |
-          echo "### Allure Report Ready! 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "Report for ${{ github.event.inputs.test_choice }} available here:" >> $GITHUB_STEP_SUMMARY
-          echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ github.event.inputs.test_choice }}/index.html" >> $GITHUB_STEP_SUMMARY
+          SUITE="${{ github.event.inputs.test_choice }}"
+          echo "### 🚀 Allure Report Ready" >> $GITHUB_STEP_SUMMARY
+          echo "**Suite:** \`$SUITE\` | **Type:** \`${{ github.event.inputs.run_type }}\` | **Shards:** ${{ github.event.inputs.shard_count }} | **Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [Open Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${SUITE}/index.html)" >> $GITHUB_STEP_SUMMARY
