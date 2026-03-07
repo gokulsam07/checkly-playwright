@@ -232,13 +232,6 @@ jobs:
           path: gh-pages-history/
         continue-on-error: true
 
-      - name: Remove Submodule Reference from gh-pages
-        run: |
-          if [ -f gh-pages-history/.gitmodules ]; then
-            rm gh-pages-history/.gitmodules
-            echo "Removed .gitmodules from gh-pages history"
-          fi
-
       # Step 6 — Generate report from merged results + history
       - name: Generate Allure Report
         uses: simple-elf/allure-report-action@master
