@@ -240,7 +240,6 @@ jobs:
           gh_pages: gh-pages-history
           allure_report: allure-report-build
           allure_history: allure-final-output
-          subfolder: ${{ github.event.inputs.test_choice }}
           keep_reports: 20
 
       # Step 7 — Publish to GitHub Pages
