@@ -165,12 +165,10 @@ jobs:
     permissions:
       contents: write
       pages: write
+      actions: read
       id-token: write
 
     steps:
-
-      - uses: actions/checkout@v4
-
       # Step 1 — Download previous merged results so rerun has full context.
       # On a full run these get overwritten anyway, but downloading first
       # means we never lose results if something goes wrong mid-job.
