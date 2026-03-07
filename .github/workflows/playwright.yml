@@ -109,14 +109,18 @@ jobs:
         id: run_tests
         run: |
           CMD="npm run ${{ github.event.inputs.test_choice }}"
+          CUSTOM="${{ github.event.inputs.custom_command }}"
+          RUN_TYPE="${{ github.event.inputs.run_type }}"
 
-          if [ "${{ github.event.inputs.run_type }}" = "rerun-failures" ]; then
+          if [ -n "$CUSTOM" ]; then
+            # Custom command takes priority — ignores run_type entirely
+            CMD="$CMD -- $CUSTOM"
+          elif [ "$RUN_TYPE" = "rerun-failures" ]; then
+            # No custom command — use --last-failed
+            # Falls back to full suite automatically if no previous failures exist
             CMD="$CMD -- --last-failed"
           fi
-
-          if [ -n "${{ github.event.inputs.custom_command }}" ]; then
-            CMD="$CMD -- ${{ github.event.inputs.custom_command }}"
-          fi
+          # else: full suite, no extra args needed
 
           if [ "${{ github.event.inputs.shard_count }}" -gt 1 ]; then
             CMD="$CMD --shard=${{ matrix.shard }}/${{ github.event.inputs.shard_count }}"
@@ -251,8 +255,4 @@ jobs:
       - name: Output Report Link
         if: always()
         run: |
-          SUITE="${{ github.event.inputs.test_choice }}"
-          echo "### 🚀 Allure Report Ready" >> $GITHUB_STEP_SUMMARY
-          echo "**Suite:** \`$SUITE\` | **Type:** \`${{ github.event.inputs.run_type }}\` | **Shards:** ${{ github.event.inputs.shard_count }} | **Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [Open Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${SUITE}/index.html)" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [Open Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ github.event.inputs.test_choice }}/index.html)" >> $GITHUB_STEP_SUMMARY
