@@ -111,23 +111,22 @@ jobs:
           CMD="npm run ${{ github.event.inputs.test_choice }}"
           CUSTOM="${{ github.event.inputs.custom_command }}"
           RUN_TYPE="${{ github.event.inputs.run_type }}"
+          SHARD_COUNT="${{ github.event.inputs.shard_count }}"
+
+          EXTRA_ARGS=""
 
           if [ -n "$CUSTOM" ]; then
-            # Custom command takes priority — ignores run_type entirely
-            CMD="$CMD -- $CUSTOM"
+            EXTRA_ARGS="$CUSTOM"
           elif [ "$RUN_TYPE" = "rerun-failures" ]; then
-            # No custom command — use --last-failed
-            # Falls back to full suite automatically if no previous failures exist
-            CMD="$CMD -- --last-failed"
-          fi
-          # else: full suite, no extra args needed
-
-          if [ "${{ github.event.inputs.shard_count }}" -gt 1 ]; then
-            CMD="$CMD --shard=${{ matrix.shard }}/${{ github.event.inputs.shard_count }}"
+            EXTRA_ARGS="--last-failed"
           fi
 
-          echo "Executing: $CMD"
-          eval $CMD
+          if [ "$SHARD_COUNT" -gt 1 ]; then
+            EXTRA_ARGS="$EXTRA_ARGS --shard=${{ matrix.shard }}/$SHARD_COUNT --pass-with-no-tests"
+          fi
+
+          echo "Executing: $CMD -- $EXTRA_ARGS"
+          eval "$CMD -- $EXTRA_ARGS"
         continue-on-error: true
 
       # Each shard uploads its own slice of results.
