@@ -1,0 +1,6 @@
+"DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
+"","403","delete env variable by key","api","Sat Mar 07 06:54:42 UTC 2026","passed","Sat Mar 07 06:54:43 UTC 2026","Environment Variable API Tests","tests/api/env-var.spec.ts","",""
+"","134","get env variable by key","api","Sat Mar 07 06:54:42 UTC 2026","passed","Sat Mar 07 06:54:42 UTC 2026","Environment Variable API Tests","tests/api/env-var.spec.ts","",""
+"","124","get all available variables","api","Sat Mar 07 06:54:42 UTC 2026","passed","Sat Mar 07 06:54:42 UTC 2026","Environment Variable API Tests","tests/api/env-var.spec.ts","",""
+"","149","update existing env variable","api","Sat Mar 07 06:54:42 UTC 2026","passed","Sat Mar 07 06:54:42 UTC 2026","Environment Variable API Tests","tests/api/env-var.spec.ts","",""
+"","535","create a new env variable","api","Sat Mar 07 06:54:41 UTC 2026","passed","Sat Mar 07 06:54:42 UTC 2026","Environment Variable API Tests","tests/api/env-var.spec.ts","",""
