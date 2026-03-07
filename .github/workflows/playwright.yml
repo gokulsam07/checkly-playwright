@@ -176,10 +176,13 @@ jobs:
       # means we never lose results if something goes wrong mid-job.
       # continue-on-error: true — artifact won't exist on very first run.
       - name: Download Previous Merged Results
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v6
         with:
           name: merged-results-${{ github.event.inputs.test_choice }}
           path: allure-results-previous/
+          workflow: playwright.yml
+          workflow_conclusion: ''        # Any conclusion — success or failure
+          if_no_artifact_found: ignore   # First run has no previous artifact
         continue-on-error: true
 
       # Step 2 — Download all shard results from this run into a separate folder
@@ -230,6 +233,13 @@ jobs:
           ref: gh-pages
           path: gh-pages-history/
         continue-on-error: true
+
+      - name: Remove Submodule Reference from gh-pages
+        run: |
+          if [ -f gh-pages-history/.gitmodules ]; then
+            rm gh-pages-history/.gitmodules
+            echo "Removed .gitmodules from gh-pages history"
+          fi
 
       # Step 6 — Generate report from merged results + history
       - name: Generate Allure Report
