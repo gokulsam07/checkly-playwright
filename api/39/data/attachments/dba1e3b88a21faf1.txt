@@ -1,0 +1,5 @@
+{
+  statusCode: 409,
+  error: 'Conflict',
+  message: 'The request was unacceptable, often due to violating some uniqueness constraint'
+}

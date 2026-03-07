@@ -1,0 +1,1 @@
+{ key: 'API_KEY', value: 'val_1', locked: true, secret: true }
